@@ -47,6 +47,18 @@ assert.match(
   'battery percent should sit directly after the green arrow on the same baseline'
 );
 
+assert.match(
+  source,
+  /_alignBatteryValueRow\(\) \{/,
+  'battery value row should be realigned after scene profiles so old pct coordinates cannot break the layout'
+);
+
+assert.match(
+  source,
+  /setAligned\('#flow-battery-arrow', powerX \+ 12, powerY\);[\s\S]*setAligned\('#flow-battery-pct', powerX \+ 25, powerY\);/,
+  'battery arrow and percent should stay locked to the battery power baseline'
+);
+
 assert.doesNotMatch(
   source,
   /\.flow-node\.inactive \.flow-node-guide\s*\{\s*opacity: 0;\s*\}/,

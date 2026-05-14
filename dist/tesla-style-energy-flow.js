@@ -1562,7 +1562,33 @@
           applied = true;
         });
       });
+      if (this._alignBatteryValueRow()) applied = true;
       if (applied && marker) this._lastAppliedSceneFlowComponentProfile = marker;
+      return applied;
+    }
+
+    _alignBatteryValueRow() {
+      const power = this.shadowRoot.querySelector('#flow-battery-power');
+      if (!power) return false;
+      const powerX = safeNum(power.getAttribute('x'), -8);
+      const powerY = safeNum(power.getAttribute('y'), 97);
+      let applied = false;
+      const setAligned = (selector, x, y) => {
+        const target = this.shadowRoot.querySelector(selector);
+        if (!target) return;
+        const nextX = String(x);
+        const nextY = String(y);
+        if (target.getAttribute('x') !== nextX) {
+          target.setAttribute('x', nextX);
+          applied = true;
+        }
+        if (target.getAttribute('y') !== nextY) {
+          target.setAttribute('y', nextY);
+          applied = true;
+        }
+      };
+      setAligned('#flow-battery-arrow', powerX + 12, powerY);
+      setAligned('#flow-battery-pct', powerX + 25, powerY);
       return applied;
     }
 
