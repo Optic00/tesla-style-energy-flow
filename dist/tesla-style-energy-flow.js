@@ -537,13 +537,13 @@
   const DAY_CLEAR_IDLE_COMPONENTS = Object.freeze({
     'solar-label': Object.freeze({ x: -16, y: -108 }),
     'solar-power': Object.freeze({ x: 0, y: -86 }),
-    'solar-guide': Object.freeze({ x1: -20, y1: -78, x2: -20, y2: 2 }),
-    'grid-label': Object.freeze({ x: 8, y: 58 }),
-    'grid-power': Object.freeze({ x: 22, y: 78 }),
-    'grid-guide': Object.freeze({ x1: 4, y1: 34, x2: 4, y2: 64 }),
-    'load-label': Object.freeze({ x: -36, y: -36 }),
-    'load-power': Object.freeze({ x: -16, y: -14 }),
-    'load-guide': Object.freeze({ x1: -32, y1: -4, x2: -32, y2: 68 }),
+    'solar-guide': Object.freeze({ x1: -20, y1: -70, x2: -20, y2: 2 }),
+    'grid-label': Object.freeze({ x: 8, y: 56 }),
+    'grid-power': Object.freeze({ x: 22, y: 76 }),
+    'grid-guide': Object.freeze({ x1: 4, y1: 26, x2: 4, y2: 64 }),
+    'load-label': Object.freeze({ x: -38, y: -50 }),
+    'load-power': Object.freeze({ x: -14, y: -28 }),
+    'load-guide': Object.freeze({ x1: -32, y1: 12, x2: -32, y2: 68 }),
     'battery-label': Object.freeze({ x: -30, y: 82 }),
     'battery-power': Object.freeze({ x: -12, y: 104 }),
     'battery-pct': Object.freeze({ x: 10, y: 104 }),
@@ -928,6 +928,37 @@
       night_rain: '',
       night_snow: '',
       night_storm: '',
+      morning_default: '',
+      afternoon_default: '',
+      evening_default: '',
+      morning: '',
+      afternoon: '',
+      evening: '',
+      night: '',
+      morning_clear_idle: '',
+      morning_clear_charging: '',
+      morning_cloudy_idle: '',
+      morning_cloudy_charging: '',
+      morning_rain_idle: '',
+      morning_rain_charging: '',
+      morning_storm_idle: '',
+      morning_storm_charging: '',
+      afternoon_clear_idle: '',
+      afternoon_clear_charging: '',
+      afternoon_cloudy_idle: '',
+      afternoon_cloudy_charging: '',
+      afternoon_rain_idle: '',
+      afternoon_rain_charging: '',
+      afternoon_storm_idle: '',
+      afternoon_storm_charging: '',
+      evening_clear_idle: '',
+      evening_clear_charging: '',
+      evening_cloudy_idle: '',
+      evening_cloudy_charging: '',
+      evening_rain_idle: '',
+      evening_rain_charging: '',
+      evening_storm_idle: '',
+      evening_storm_charging: '',
       day_clear_idle: '',
       day_clear_charging: '',
       night_clear_idle: '',
@@ -1341,6 +1372,21 @@
       return hour >= 7 && hour < 19 ? 'day' : 'night';
     }
 
+    _sceneTimeSlot(period) {
+      if (period === 'night') return 'night';
+      const hour = new Date().getHours();
+      if (hour >= 5 && hour < 11) return 'morning';
+      if (hour >= 17 && hour < 21) return 'evening';
+      return 'afternoon';
+    }
+
+    _setSceneTone(timeSlot, weatherGroup) {
+      const wrap = this.shadowRoot.querySelector('.wrap');
+      if (!wrap) return;
+      const stormy = weatherGroup === 'rain' || weatherGroup === 'storm' || weatherGroup === 'snow';
+      wrap.dataset.sceneTone = stormy ? 'storm' : (timeSlot || 'afternoon');
+    }
+
     _defaultBackgroundMap() {
       const base = this._config.background_asset_base || '/local/community/tesla-style-energy-flow/backgrounds';
       const out = {};
@@ -1383,6 +1429,7 @@
 
       const weatherState = this._entityState(cfg.entities.weather)?.state || '';
       const period = this._scenePeriod(weatherState);
+      const timeSlot = this._sceneTimeSlot(period);
       const weatherGroup = this._weatherGroup(weatherState);
       const chargeState = evCharging ? 'charging' : 'idle';
       const map = {
@@ -1399,6 +1446,25 @@
         const dualClearUrl = String(map[dualClearKey] || '').trim();
         if (dualClearUrl) return dualClearUrl;
       }
+
+      const timeExactKey = `${timeSlot}_${weatherGroup}_${chargeState}`;
+      const timeExactUrl = String(map[timeExactKey] || '').trim();
+      if (timeExactUrl) return timeExactUrl;
+
+      const timeClearKey = `${timeSlot}_clear_${chargeState}`;
+      const timeClearUrl = String(map[timeClearKey] || '').trim();
+      if (timeClearUrl) return timeClearUrl;
+
+      const timeWeatherKey = `${timeSlot}_${weatherGroup}`;
+      const timeWeatherUrl = String(map[timeWeatherKey] || '').trim();
+      if (timeWeatherUrl) return timeWeatherUrl;
+
+      const timeDefaultKey = `${timeSlot}_default`;
+      const timeDefaultKeyUrl = String(map[timeDefaultKey] || '').trim();
+      if (timeDefaultKeyUrl) return timeDefaultKeyUrl;
+
+      const timeDefaultUrl = String(map[timeSlot] || '').trim();
+      if (timeDefaultUrl) return timeDefaultUrl;
 
       const exactKey = `${period}_${weatherGroup}_${chargeState}`;
       const exactUrl = String(map[exactKey] || '').trim();
@@ -1552,8 +1618,49 @@
             background: #020617;
           }
           .flow-scene-dim {
-            fill: #020617;
-            opacity: 0.18;
+            fill: #020817;
+            opacity: 0.34;
+          }
+          .flow-sky-dim {
+            fill: url(#flow-sky-fade);
+            opacity: 0.55;
+          }
+          .flow-bottom-dim {
+            fill: url(#flow-bottom-fade);
+            opacity: 0.42;
+          }
+          .flow-vignette {
+            fill: url(#flow-vignette);
+            opacity: 0.5;
+          }
+          .wrap[data-scene-tone="morning"] .flow-scene-dim {
+            fill: #08213c;
+            opacity: 0.36;
+          }
+          .wrap[data-scene-tone="morning"] .flow-sky-dim {
+            opacity: 0.45;
+          }
+          .wrap[data-scene-tone="afternoon"] .flow-scene-dim {
+            fill: #06111f;
+            opacity: 0.4;
+          }
+          .wrap[data-scene-tone="afternoon"] .flow-sky-dim {
+            opacity: 0.66;
+          }
+          .wrap[data-scene-tone="evening"] .flow-scene-dim {
+            fill: #080f1c;
+            opacity: 0.48;
+          }
+          .wrap[data-scene-tone="evening"] .flow-sky-dim {
+            opacity: 0.58;
+          }
+          .wrap[data-scene-tone="night"] .flow-scene-dim,
+          .wrap[data-scene-tone="storm"] .flow-scene-dim {
+            fill: #020712;
+            opacity: 0.58;
+          }
+          .wrap[data-scene-tone="storm"] .flow-sky-dim {
+            opacity: 0.72;
           }
           .flow-node-bg {
             fill: rgba(255,255,255,0.08);
@@ -1565,28 +1672,28 @@
             filter: drop-shadow(0 0 6px rgba(255,255,255,0.35));
           }
           .flow-node-guide {
-            stroke: rgba(255, 255, 255, 0.5);
-            stroke-width: 1.35;
+            stroke: rgba(214, 218, 224, 0.48);
+            stroke-width: 1.15;
             stroke-linecap: round;
-            opacity: 0.86;
+            opacity: 0.8;
           }
           .flow-label,
           .flow-power,
           .flow-pct,
           .flow-status {
             fill: #f8fafc;
-            text-shadow: 0 1px 2px rgba(2, 6, 23, 0.42);
+            text-shadow: 0 1px 2px rgba(2, 6, 23, 0.58);
             text-anchor: middle;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.82))
-                    drop-shadow(0 0 9px rgba(0, 0, 0, 0.62));
+            filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.95))
+                    drop-shadow(0 0 10px rgba(0, 0, 0, 0.78));
           }
           .flow-label {
             font-size: calc(10px * var(--flow-font-scale));
             font-weight: 700;
             letter-spacing: 0.06em;
             text-transform: uppercase;
-            fill: rgba(196, 200, 205, 0.72);
+            fill: rgba(198, 202, 208, 0.78);
           }
           .flow-power {
             font-size: calc(15.5px * var(--flow-font-scale));
@@ -1722,12 +1829,31 @@
           }
         </style>
         <ha-card>
-          <div class="wrap ${showLabelsClass}">
+          <div class="wrap ${showLabelsClass}" data-scene-tone="afternoon">
             ${titleHtml}
             <div class="scene">
               <svg viewBox="${300 - (300 / sceneScale)} ${230 - (230 / sceneScale)} ${600 / sceneScale} ${460 / sceneScale}">
+                <defs>
+                  <linearGradient id="flow-sky-fade" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#020817" stop-opacity="0.9"></stop>
+                    <stop offset="62%" stop-color="#020817" stop-opacity="0.28"></stop>
+                    <stop offset="100%" stop-color="#020817" stop-opacity="0"></stop>
+                  </linearGradient>
+                  <linearGradient id="flow-bottom-fade" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#020817" stop-opacity="0"></stop>
+                    <stop offset="56%" stop-color="#020817" stop-opacity="0.18"></stop>
+                    <stop offset="100%" stop-color="#020817" stop-opacity="0.74"></stop>
+                  </linearGradient>
+                  <radialGradient id="flow-vignette" cx="50%" cy="43%" r="72%">
+                    <stop offset="54%" stop-color="#020817" stop-opacity="0"></stop>
+                    <stop offset="100%" stop-color="#020817" stop-opacity="0.78"></stop>
+                  </radialGradient>
+                </defs>
                 <image id="flow-scene-image" href="${cfg.background}" x="0" y="0" width="600" height="460" preserveAspectRatio="xMidYMid slice"></image>
                 <rect class="flow-scene-dim" x="0" y="0" width="600" height="460"></rect>
+                <rect class="flow-sky-dim" x="0" y="0" width="600" height="260"></rect>
+                <rect class="flow-bottom-dim" x="0" y="230" width="600" height="230"></rect>
+                <rect class="flow-vignette" x="0" y="0" width="600" height="460"></rect>
 
                 <path id="line-solar-load" class="flow-line" d="${pathD('line-solar-load', 'line_solar_load')}"></path>
                 <path id="line-grid-load" class="flow-line" d="${pathD('line-grid-load', 'line_grid_load')}"></path>
@@ -1869,6 +1995,10 @@
       if (roofBGroup) {
         roofBGroup.classList.toggle('roof-hidden', !(roofBPower > 0 || roofBVoltage > 0 || roofBCurrent > 0));
       }
+      const weatherState = this._entityState(cfg.entities.weather)?.state || '';
+      const period = this._scenePeriod(weatherState);
+      const weatherGroup = this._weatherGroup(weatherState);
+      this._setSceneTone(this._sceneTimeSlot(period), weatherGroup);
       const sceneHref = this._resolveBackground(evSceneActive, useDualScene);
       this._setBackground(sceneHref);
       this._applySceneFlowPaths(sceneHref);
@@ -2370,6 +2500,12 @@
               <input data-path="background_map.day_default" value="${b.day_default || ''}">
               <label>background_map.night_default</label>
               <input data-path="background_map.night_default" value="${b.night_default || ''}">
+              <label>background_map.morning_default</label>
+              <input data-path="background_map.morning_default" value="${b.morning_default || ''}">
+              <label>background_map.afternoon_default</label>
+              <input data-path="background_map.afternoon_default" value="${b.afternoon_default || ''}">
+              <label>background_map.evening_default</label>
+              <input data-path="background_map.evening_default" value="${b.evening_default || ''}">
               <label>background_map.day_clear</label>
               <input data-path="background_map.day_clear" value="${b.day_clear || ''}">
               <label>background_map.day_cloudy</label>
@@ -2386,6 +2522,18 @@
               <input data-path="background_map.day_clear_idle" value="${b.day_clear_idle || ''}">
               <label>background_map.day_clear_charging</label>
               <input data-path="background_map.day_clear_charging" value="${b.day_clear_charging || ''}">
+              <label>background_map.morning_clear_idle</label>
+              <input data-path="background_map.morning_clear_idle" value="${b.morning_clear_idle || ''}">
+              <label>background_map.morning_clear_charging</label>
+              <input data-path="background_map.morning_clear_charging" value="${b.morning_clear_charging || ''}">
+              <label>background_map.afternoon_clear_idle</label>
+              <input data-path="background_map.afternoon_clear_idle" value="${b.afternoon_clear_idle || ''}">
+              <label>background_map.afternoon_clear_charging</label>
+              <input data-path="background_map.afternoon_clear_charging" value="${b.afternoon_clear_charging || ''}">
+              <label>background_map.evening_clear_idle</label>
+              <input data-path="background_map.evening_clear_idle" value="${b.evening_clear_idle || ''}">
+              <label>background_map.evening_clear_charging</label>
+              <input data-path="background_map.evening_clear_charging" value="${b.evening_clear_charging || ''}">
               <label>background_map.night_clear_idle</label>
               <input data-path="background_map.night_clear_idle" value="${b.night_clear_idle || ''}">
               <label>background_map.night_clear_charging</label>

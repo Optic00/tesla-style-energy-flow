@@ -31,7 +31,7 @@ assert.match(
 
 assert.match(
   source,
-  /'grid-label': Object\.freeze\(\{ x: 8, y: 58 \}\)/,
+  /'grid-label': Object\.freeze\(\{ x: 8, y: 56 \}\)/,
   'day clear idle grid label should sit high enough to stay inside the card'
 );
 
@@ -39,6 +39,30 @@ assert.match(
   source,
   /<text class="flow-pct" id="flow-battery-pct" x="8" y="97" text-anchor="start">--%<\/text>/,
   'battery percent should sit on the same baseline as battery power, Tesla-app style'
+);
+
+assert.match(
+  source,
+  /morning_clear_idle: '',[\s\S]*afternoon_clear_idle: '',[\s\S]*evening_clear_idle: '',[\s\S]*night_clear_idle: '',/,
+  'background_map should expose time-of-day keys for cleaner morning, afternoon, evening and night assets'
+);
+
+assert.match(
+  source,
+  /_sceneTimeSlot\(period\) \{/,
+  'the card should derive a time-of-day slot for background lookup and tone overlays'
+);
+
+assert.match(
+  source,
+  /data-scene-tone="afternoon"/,
+  'the static render should default to a readable afternoon tone until live state is available'
+);
+
+assert.match(
+  source,
+  /<rect class="flow-sky-dim" x="0" y="0" width="600" height="260"><\/rect>/,
+  'the SVG should include a sky dimming layer so text remains readable on bright backgrounds'
 );
 
 assert.equal(
