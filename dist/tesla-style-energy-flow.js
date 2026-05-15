@@ -4,6 +4,7 @@
 (function () {
   const CARD_TYPE = 'tesla-style-energy-flow';
   const FLOW_MIN_W = 50;
+  const EDITOR_UPDATE_DEBOUNCE_MS = 500;
   const SUPPORTED_LANGS = ['it', 'en', 'es', 'fr', 'de'];
   const DEFAULT_LANG = 'it';
   const LANGUAGE_OPTIONS = Object.freeze([
@@ -25,9 +26,17 @@
     ['#flow-ev-label', '#flow-ev-power', '#flow-ev-guide'],
     ['#flow-ev2-label', '#flow-ev2-power', '#flow-ev2-guide']
   ]);
+  const GUIDE_CLEARANCE_TEXT_PAIRS = Object.freeze([
+    ...GUIDE_ALIGNED_TEXT_PAIRS,
+    ['#flow-battery-label', '#flow-battery-power', '#flow-battery-guide']
+  ]);
   const GUIDE_TEXT_CLEARANCE = Object.freeze({
     base: 8,
     scaleExtra: 6
+  });
+  const VIEWBOX_TEXT_FIT = Object.freeze({
+    margin: 18,
+    labelPowerGap: 22
   });
   const I18N = Object.freeze({
     it: {
@@ -707,8 +716,8 @@
       'solar-label': Object.freeze({ x: 4, y: -110 }),
       'solar-power': Object.freeze({ x: 20, y: -86 }),
       'solar-guide': Object.freeze({ x1: 0, y1: -92, x2: 0, y2: -12 }),
-      'grid-label': Object.freeze({ x: 18, y: 76 }),
-      'grid-power': Object.freeze({ x: 32, y: 102 }),
+      'grid-label': Object.freeze({ x: 18, y: -14 }),
+      'grid-power': Object.freeze({ x: 18, y: 8 }),
       'grid-guide': Object.freeze({ x1: 18, y1: 30, x2: 18, y2: 60 }),
       'load-label': Object.freeze({ x: -36, y: -28 }),
       'load-power': Object.freeze({ x: -16, y: -2 }),
@@ -848,6 +857,22 @@
       'ev2-guide': Object.freeze({ x1: -18, y1: -68, x2: -18, y2: -28 })
     })
   });
+
+  const POSITION_EDITOR_SCENES = Object.freeze(
+    Object.keys(SCENE_FLOW_COMPONENT_MAP)
+      .filter((key) => key.startsWith('scene_'))
+      .map((key) => Object.freeze({
+        key,
+        label: key.replace(/^scene_/, '').replace(/\.png$/, '').replace(/_/g, ' ')
+      }))
+  );
+
+  const POSITION_EDITOR_GROUPS = Object.freeze([
+    Object.freeze({ title: 'Solar', label: 'solar-label', power: 'solar-power', guide: 'solar-guide' }),
+    Object.freeze({ title: 'Netz', label: 'grid-label', power: 'grid-power', guide: 'grid-guide' }),
+    Object.freeze({ title: 'Haus', label: 'load-label', power: 'load-power', guide: 'load-guide' }),
+    Object.freeze({ title: 'Batterie', label: 'battery-label', power: 'battery-power', guide: 'battery-guide' })
+  ]);
 
   const FLOW_COMPONENT_BINDINGS = Object.freeze({
     'solar-label': Object.freeze({ id: 'flow-solar-label', attrs: Object.freeze(['x', 'y']) }),
@@ -1577,6 +1602,8 @@
       });
       if (this._alignBatteryValueRow()) applied = true;
       if (this._alignLabelPowerColumns()) applied = true;
+      if (this._fitTextBlocksToViewBox()) applied = true;
+      if (this._alignBatteryValueRow()) applied = true;
       if (this._alignGuideTextClearance()) applied = true;
       if (applied && marker) this._lastAppliedSceneFlowComponentProfile = marker;
       return applied;
@@ -1623,6 +1650,116 @@
       return applied;
     }
 
+    _sceneViewBox() {
+      const sceneScale = clamp(safeNum(this._config.scene_scale, 1), 0.6, 1.4);
+      return {
+        minY: 230 - (230 / sceneScale),
+        maxY: 230 + (230 / sceneScale)
+      };
+    }
+
+    _elementSceneY(el) {
+      if (!el) return 0;
+      let y = safeNum(el.getAttribute('y'), 0);
+      let node = el.parentElement;
+      while (node && node.tagName?.toLowerCase() !== 'svg') {
+        const transform = node.getAttribute?.('transform') || '';
+        const match = transform.match(/translate\(\s*[-\d.]+(?:[,\s]+([-\d.]+))?/);
+        if (match) y += safeNum(match[1], 0);
+        node = node.parentElement;
+      }
+      return y;
+    }
+
+    _shiftTextY(targets, delta) {
+      let applied = false;
+      targets.forEach((target) => {
+        const y = safeNum(target.getAttribute('y'), 0);
+        if (this._setSvgAttrs(target, { y: Number((y + delta).toFixed(2)) })) applied = true;
+      });
+      return applied;
+    }
+
+    _shiftGuideY(guide, delta) {
+      const y1 = safeNum(guide.getAttribute('y1'), 0);
+      const y2 = safeNum(guide.getAttribute('y2'), y1);
+      return this._setSvgAttrs(guide, {
+        y1: Number((y1 + delta).toFixed(2)),
+        y2: Number((y2 + delta).toFixed(2))
+      });
+    }
+
+    _fitTextBlockToViewBox(selectors, viewBox) {
+      const targets = selectors
+        .map((selector) => this.shadowRoot.querySelector(selector))
+        .filter(Boolean);
+      if (!targets.length) return false;
+      const baselines = targets.map((target) => this._elementSceneY(target));
+      const top = Math.min(...baselines);
+      const bottom = Math.max(...baselines);
+      const minY = viewBox.minY + VIEWBOX_TEXT_FIT.margin;
+      const maxY = viewBox.maxY - VIEWBOX_TEXT_FIT.margin;
+      let delta = 0;
+      if (top < minY) delta = minY - top;
+      if (bottom + delta > maxY) delta = maxY - bottom;
+      if (!delta) return false;
+      return this._shiftTextY(targets, delta);
+    }
+
+    _fitGuideTextPairToViewBox(label, power, guide, viewBox) {
+      const bottom = Math.max(this._elementSceneY(label), this._elementSceneY(power));
+      const maxY = viewBox.maxY - VIEWBOX_TEXT_FIT.margin;
+      if (bottom <= maxY) return false;
+      const y1 = safeNum(guide.getAttribute('y1'), 0);
+      const y2 = safeNum(guide.getAttribute('y2'), y1);
+      const guideTop = Math.min(y1, y2);
+      const powerY = safeNum(power.getAttribute('y'), 0);
+      const labelY = safeNum(label.getAttribute('y'), powerY - VIEWBOX_TEXT_FIT.labelPowerGap);
+      const gap = Math.abs(powerY - labelY) || VIEWBOX_TEXT_FIT.labelPowerGap;
+      const nextPowerY = guideTop - this._guideTextGap();
+      const nextLabelY = nextPowerY - gap;
+      let applied = false;
+      if (this._setSvgAttrs(label, { y: nextLabelY })) applied = true;
+      if (this._setSvgAttrs(power, { y: nextPowerY })) applied = true;
+      const fitted = this._fitTextBlockToViewBox([`#${label.id}`, `#${power.id}`], viewBox);
+      return applied || fitted;
+    }
+
+    _fitBatteryBlockToViewBox(viewBox) {
+      const label = this.shadowRoot.querySelector('#flow-battery-label');
+      const power = this.shadowRoot.querySelector('#flow-battery-power');
+      const guide = this.shadowRoot.querySelector('#flow-battery-guide');
+      if (!label || !power || !guide) return false;
+      const baselines = [label, power].map((target) => this._elementSceneY(target));
+      const top = Math.min(...baselines);
+      const bottom = Math.max(...baselines);
+      const minY = viewBox.minY + VIEWBOX_TEXT_FIT.margin;
+      const maxY = viewBox.maxY - VIEWBOX_TEXT_FIT.margin;
+      let delta = 0;
+      if (top < minY) delta = minY - top;
+      if (bottom + delta > maxY) delta = maxY - bottom;
+      if (!delta) return false;
+      let applied = false;
+      if (this._shiftTextY([label, power], delta)) applied = true;
+      if (this._shiftGuideY(guide, delta)) applied = true;
+      return applied;
+    }
+
+    _fitTextBlocksToViewBox() {
+      const viewBox = this._sceneViewBox();
+      let applied = false;
+      GUIDE_ALIGNED_TEXT_PAIRS.forEach(([labelSelector, powerSelector, guideSelector]) => {
+        const label = this.shadowRoot.querySelector(labelSelector);
+        const power = this.shadowRoot.querySelector(powerSelector);
+        const guide = this.shadowRoot.querySelector(guideSelector);
+        if (!label || !power || !guide) return;
+        if (this._fitGuideTextPairToViewBox(label, power, guide, viewBox)) applied = true;
+        if (this._fitTextBlockToViewBox([labelSelector, powerSelector], viewBox)) applied = true;
+      });
+      if (this._fitBatteryBlockToViewBox(viewBox)) applied = true;
+      return applied;
+    }
+
     _guideTextGap() {
       const fontScale = clamp(safeNum(this._config.font_scale, 1), 0.75, 1.35);
       return GUIDE_TEXT_CLEARANCE.base + ((fontScale - 1) * GUIDE_TEXT_CLEARANCE.scaleExtra);
@@ -1635,7 +1772,7 @@
     _alignGuideTextClearance() {
       const gap = this._guideTextGap();
       let applied = false;
-      GUIDE_ALIGNED_TEXT_PAIRS.forEach(([labelSelector, powerSelector, guideSelector]) => {
+      GUIDE_CLEARANCE_TEXT_PAIRS.forEach(([labelSelector, powerSelector, guideSelector]) => {
         const label = this.shadowRoot.querySelector(labelSelector);
         const power = this.shadowRoot.querySelector(powerSelector);
         const guide = this.shadowRoot.querySelector(guideSelector);
@@ -2270,6 +2407,9 @@
       this._config = deepMerge(DEFAULT_CONFIG, {});
       this._hass = null;
       this._configSignature = JSON.stringify(this._config);
+      this._pendingEditorUpdate = null;
+      this._editingPath = '';
+      this._positionSceneKey = POSITION_EDITOR_SCENES[0]?.key || 'scene_day_clear_idle.png';
     }
 
     setConfig(config) {
@@ -2286,12 +2426,18 @@
       if (nextSignature === this._configSignature) return;
       this._config = nextConfig;
       this._configSignature = nextSignature;
+      if (this._isEditorBusy()) return;
       this._render();
     }
 
     set hass(hass) {
       this._hass = hass;
+      if (this._isEditorBusy()) return;
       this._render();
+    }
+
+    _isEditorBusy() {
+      return !!this._editingPath || !!this._pendingEditorUpdate;
     }
 
     _emitConfig() {
@@ -2302,7 +2448,7 @@
       }));
     }
 
-    _update(path, value) {
+    _applyEditorValue(path, value) {
       if (path === 'language') {
         const normalized = normalizeLanguageCode(value);
         value = (normalized === 'auto' || SUPPORTED_LANGS.includes(normalized)) ? normalized : 'auto';
@@ -2318,8 +2464,29 @@
       cur[keys[keys.length - 1]] = value;
       this._config = deepMerge(DEFAULT_CONFIG, next);
       this._configSignature = JSON.stringify(this._config);
+      return path;
+    }
+
+    _update(path, value) {
+      this._applyEditorValue(path, value);
       this._emitConfig();
       if (path === 'language') this._render();
+    }
+
+    _queueEditorUpdate(path, value) {
+      this._applyEditorValue(path, value);
+      if (this._pendingEditorUpdate) clearTimeout(this._pendingEditorUpdate);
+      this._pendingEditorUpdate = setTimeout(() => {
+        this._pendingEditorUpdate = null;
+        this._emitConfig();
+      }, EDITOR_UPDATE_DEBOUNCE_MS);
+    }
+
+    _flushEditorUpdate() {
+      if (!this._pendingEditorUpdate) return;
+      clearTimeout(this._pendingEditorUpdate);
+      this._pendingEditorUpdate = null;
+      this._emitConfig();
     }
 
     _updateJson(path, raw) {
@@ -2440,6 +2607,98 @@
       `;
     }
 
+    _sceneFlowComponentMap() {
+      return deepMerge(SCENE_FLOW_COMPONENT_MAP, this._config.scene_component_map || {});
+    }
+
+    _selectedPositionScene() {
+      const sceneKey = this._positionSceneKey || sceneFileName(this._config.background) || POSITION_EDITOR_SCENES[0]?.key;
+      return POSITION_EDITOR_SCENES.some((scene) => scene.key === sceneKey)
+        ? sceneKey
+        : (POSITION_EDITOR_SCENES[0]?.key || 'scene_day_clear_idle.png');
+    }
+
+    _positionSceneOptions(selectedScene) {
+      return POSITION_EDITOR_SCENES
+        .map(({ key, label }) => {
+          const selected = key === selectedScene ? ' selected' : '';
+          return `<option value="${this._escapeHtml(key)}"${selected}>${this._escapeHtml(label)}</option>`;
+        })
+        .join('');
+    }
+
+    _positionValue(sceneKey, componentKey, attr) {
+      const scene = this._sceneFlowComponentMap()[sceneKey] || {};
+      return safeNum(scene[componentKey]?.[attr], 0);
+    }
+
+    _positionNumberInput(sceneKey, componentKey, attr, label) {
+      const value = this._positionValue(sceneKey, componentKey, attr);
+      const path = `${sceneKey}:${componentKey}.${attr}`;
+      return `
+        <label>${label}</label>
+        <input
+          type="number"
+          step="1"
+          data-position-path="${this._escapeHtml(path)}"
+          data-position-scene-key="${this._escapeHtml(sceneKey)}"
+          data-position-component="${this._escapeHtml(componentKey)}"
+          data-position-attr="${this._escapeHtml(attr)}"
+          value="${value}">
+      `;
+    }
+
+    _positionGroupRows(sceneKey, group) {
+      return `
+        <div class="position-group">
+          <div class="position-title">${this._escapeHtml(group.title)}</div>
+          <div class="position-fields">
+            ${this._positionNumberInput(sceneKey, group.label, 'x', 'Label X')}
+            ${this._positionNumberInput(sceneKey, group.label, 'y', 'Label Y')}
+            ${this._positionNumberInput(sceneKey, group.power, 'x', 'Wert X')}
+            ${this._positionNumberInput(sceneKey, group.power, 'y', 'Wert Y')}
+            ${this._positionNumberInput(sceneKey, group.guide, 'x1', 'Strich X1')}
+            ${this._positionNumberInput(sceneKey, group.guide, 'y1', 'Strich Y1')}
+            ${this._positionNumberInput(sceneKey, group.guide, 'x2', 'Strich X2')}
+            ${this._positionNumberInput(sceneKey, group.guide, 'y2', 'Strich Y2')}
+          </div>
+        </div>
+      `;
+    }
+
+    _positionEditorControls() {
+      const selectedScene = this._selectedPositionScene();
+      return `
+        <label>Szene</label>
+        <select data-position-scene>
+          ${this._positionSceneOptions(selectedScene)}
+        </select>
+        <div class="position-groups">
+          ${POSITION_EDITOR_GROUPS.map((group) => this._positionGroupRows(selectedScene, group)).join('')}
+        </div>
+      `;
+    }
+
+    _updateSceneComponentPosition(sceneKey, componentKey, attr, value, emit = true) {
+      const nextMap = { ...(this._config.scene_component_map || {}) };
+      const scene = { ...(nextMap[sceneKey] || {}) };
+      const component = { ...(scene[componentKey] || {}) };
+      component[attr] = Number(safeNum(value, 0).toFixed(2));
+      scene[componentKey] = component;
+      nextMap[sceneKey] = scene;
+      this._applyEditorValue('scene_component_map', nextMap);
+      if (emit) this._emitConfig();
+    }
+
+    _queueSceneComponentPosition(sceneKey, componentKey, attr, value) {
+      this._updateSceneComponentPosition(sceneKey, componentKey, attr, value, false);
+      if (this._pendingEditorUpdate) clearTimeout(this._pendingEditorUpdate);
+      this._pendingEditorUpdate = setTimeout(() => {
+        this._pendingEditorUpdate = null;
+        this._emitConfig();
+      }, EDITOR_UPDATE_DEBOUNCE_MS);
+    }
+
     _render() {
       const sensorIds = this._entityIdsByDomain('sensor');
       const switchIds = this._entityIdsByDomain('switch');
@@ -2495,7 +2754,38 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
           }
           textarea.positions-json {
-            min-height: 240px;
+            min-height: 180px;
+          }
+          details.position-json-details summary {
+            cursor: pointer;
+            color: var(--secondary-text-color);
+            font-size: 12px;
+            padding: 4px 0;
+          }
+          .position-groups {
+            display: grid;
+            gap: 10px;
+          }
+          .position-group {
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-top: 10px;
+            display: grid;
+            gap: 8px;
+          }
+          .position-title {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--primary-text-color);
+          }
+          .position-fields {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 6px 8px;
+          }
+          .position-fields label {
+            align-self: end;
           }
           .row {
             display: grid;
@@ -2670,26 +2960,72 @@
           <div class="block">
             <h4>Scene Positions</h4>
             <div class="grid">
-              <label>scene_component_map</label>
-              <textarea class="positions-json" data-json-path="scene_component_map" data-commit="change" spellcheck="false">${this._escapeHtml(this._jsonString('scene_component_map'))}</textarea>
+              ${this._positionEditorControls()}
+              <details class="position-json-details">
+                <summary>scene_component_map JSON</summary>
+                <textarea class="positions-json" data-json-path="scene_component_map" data-commit="change" spellcheck="false">${this._escapeHtml(this._jsonString('scene_component_map'))}</textarea>
+              </details>
             </div>
-            <div class="hint">Advanced: edit label, percentage and guide positions per scene. Paths are intentionally excluded here.</div>
+            <div class="hint">Battery percent follows the battery kW value automatically. Path geometry stays in YAML/JSON.</div>
           </div>
         </div>
       `;
 
+      const positionSceneSelect = this.shadowRoot.querySelector('select[data-position-scene]');
+      if (positionSceneSelect) {
+        positionSceneSelect.addEventListener('change', () => {
+          this._flushEditorUpdate();
+          this._positionSceneKey = positionSceneSelect.value;
+          this._render();
+        });
+      }
+
+      this.shadowRoot.querySelectorAll('input[data-position-path]').forEach((el) => {
+        const path = el.dataset.positionPath;
+        el.addEventListener('focus', () => {
+          this._editingPath = `position:${path}`;
+        });
+        el.addEventListener('input', () => {
+          this._queueSceneComponentPosition(
+            el.dataset.positionSceneKey,
+            el.dataset.positionComponent,
+            el.dataset.positionAttr,
+            el.value
+          );
+        });
+        el.addEventListener('blur', () => {
+          this._editingPath = '';
+          this._flushEditorUpdate();
+        });
+      });
+
       this.shadowRoot.querySelectorAll('input, select, textarea').forEach((el) => {
         if (el.dataset.jsonPath) return;
+        if (el.dataset.positionPath || el.dataset.positionScene !== undefined) return;
         const path = el.dataset.path;
         if (!path) return;
         const eventName = this._editorCommitEvent(el);
-        el.addEventListener(eventName, () => {
+        const readValue = () => {
           if (el.type === 'checkbox') {
-            this._update(path, el.checked);
-          } else if (el.type === 'number') {
-            this._update(path, safeNum(el.value, 0));
+            return el.checked;
+          }
+          if (el.type === 'number') {
+            return safeNum(el.value, 0);
+          }
+          return el.value;
+        };
+        el.addEventListener('focus', () => {
+          this._editingPath = path;
+        });
+        el.addEventListener('blur', () => {
+          this._editingPath = '';
+          this._flushEditorUpdate();
+        });
+        el.addEventListener(eventName, () => {
+          if (eventName === 'input') {
+            this._queueEditorUpdate(path, readValue());
           } else {
-            this._update(path, el.value);
+            this._update(path, readValue());
           }
         });
       });
@@ -2697,6 +3033,12 @@
       this.shadowRoot.querySelectorAll('textarea[data-json-path]').forEach((el) => {
         const path = el.dataset.jsonPath;
         if (!path) return;
+        el.addEventListener('focus', () => {
+          this._editingPath = `json:${path}`;
+        });
+        el.addEventListener('blur', () => {
+          this._editingPath = '';
+        });
         el.addEventListener('change', () => {
           const ok = this._updateJson(path, el.value);
           if (typeof el.setCustomValidity === 'function') {

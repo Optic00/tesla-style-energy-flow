@@ -97,20 +97,86 @@ assert.match(
 
 assert.match(
   source,
+  /const VIEWBOX_TEXT_FIT = Object\.freeze\(\{\s*margin: 18,\s*labelPowerGap: 22\s*\}\);/,
+  'scene_scale should have a viewbox text safety margin'
+);
+
+assert.match(
+  source,
+  /'scene_night_clear_idle\.png': Object\.freeze\(\{[\s\S]*'grid-label': Object\.freeze\(\{ x: 18, y: -14 \}\),\s*'grid-power': Object\.freeze\(\{ x: 18, y: 8 \}\),\s*'grid-guide': Object\.freeze\(\{ x1: 18, y1: 30, x2: 18, y2: 60 \}\)/,
+  'night clear idle grid label and power should sit above the grid guide line'
+);
+
+assert.match(
+  source,
+  /_sceneViewBox\(\) \{[\s\S]*const sceneScale = clamp\(safeNum\(this\._config\.scene_scale, 1\), 0\.6, 1\.4\);[\s\S]*minY: 230 - \(230 \/ sceneScale\),[\s\S]*maxY: 230 \+ \(230 \/ sceneScale\)/,
+  'scene_scale should expose the visible SVG viewbox for text fitting'
+);
+
+assert.match(
+  source,
+  /_fitTextBlocksToViewBox\(\) \{[\s\S]*const viewBox = this\._sceneViewBox\(\);[\s\S]*this\._fitGuideTextPairToViewBox\(label, power, guide, viewBox\)[\s\S]*this\._fitBatteryBlockToViewBox\(viewBox\)/,
+  'labels and battery values should be fitted back into the scaled scene viewbox'
+);
+
+assert.match(
+  source,
+  /_fitBatteryBlockToViewBox\(viewBox\) \{[\s\S]*'#flow-battery-label'[\s\S]*'#flow-battery-power'[\s\S]*'#flow-battery-guide'[\s\S]*this\._shiftGuideY\(guide, delta\)/,
+  'battery guide line should move with battery label and kW when scene_scale reduces the visible viewbox'
+);
+
+assert.match(
+  source,
   /_alignGuideTextClearance\(\) \{[\s\S]*const gap = this\._guideTextGap\(\);[\s\S]*const textTop = Math\.min\(labelY, powerY\);[\s\S]*const textBottom = Math\.max\(labelY, powerY\);[\s\S]*this\._moveGuideEndpoint\(guide, nearAttr, nextNear\)/,
   'guide line endpoints should keep a font-scale-aware clearance from nearby labels and values'
 );
 
 assert.match(
   source,
-  /_editorCommitEvent\(el\) \{[\s\S]*if \(el\.type === 'checkbox' \|\| el\.tagName === 'SELECT'\) return 'change';[\s\S]*return el\.dataset\.commit \|\| 'input';[\s\S]*\}/,
-  'visual editor text and number controls should emit config updates while typing'
+  /const GUIDE_CLEARANCE_TEXT_PAIRS = Object\.freeze\(\[[\s\S]*\['#flow-battery-label', '#flow-battery-power', '#flow-battery-guide'\][\s\S]*\]\);/,
+  'battery guide line should use the same text clearance guard as solar, grid and house labels'
 );
 
 assert.match(
   source,
-  /const eventName = this\._editorCommitEvent\(el\);/,
-  'visual editor should use control-specific commit events'
+  /const EDITOR_UPDATE_DEBOUNCE_MS = 500;/,
+  'visual editor text and number controls should debounce Home Assistant config updates'
+);
+
+assert.match(
+  source,
+  /_queueEditorUpdate\(path, value\) \{[\s\S]*this\._applyEditorValue\(path, value\);[\s\S]*setTimeout\(\(\) => \{[\s\S]*this\._emitConfig\(\);[\s\S]*EDITOR_UPDATE_DEBOUNCE_MS[\s\S]*\}/,
+  'visual editor should update local input state immediately but emit config changes after a short pause'
+);
+
+assert.match(
+  source,
+  /set hass\(hass\) \{[\s\S]*this\._hass = hass;[\s\S]*if \(this\._isEditorBusy\(\)\) return;[\s\S]*this\._render\(\);[\s\S]*\}/,
+  'visual editor should not rerender focused inputs on every Home Assistant state refresh'
+);
+
+assert.match(
+  source,
+  /const POSITION_EDITOR_SCENES = Object\.freeze\(/,
+  'visual editor should expose known scene profiles in a position editor'
+);
+
+assert.match(
+  source,
+  /const POSITION_EDITOR_GROUPS = Object\.freeze\(\[[\s\S]*title: 'Solar'[\s\S]*title: 'Netz'[\s\S]*title: 'Haus'[\s\S]*title: 'Batterie'[\s\S]*\]\);/,
+  'visual editor should provide per-component controls for label, value and guide positions'
+);
+
+assert.match(
+  source,
+  /data-position-scene/,
+  'visual editor should render a scene selector for position tuning'
+);
+
+assert.match(
+  source,
+  /_updateSceneComponentPosition\(sceneKey, componentKey, attr, value, emit = true\) \{[\s\S]*const nextMap = \{ \.\.\.\(this\._config\.scene_component_map \|\| \{\}\) \};[\s\S]*nextMap\[sceneKey\] = scene;[\s\S]*this\._applyEditorValue\('scene_component_map', nextMap\);/,
+  'scene position updates should preserve scene filenames with dots instead of using dotted config paths'
 );
 
 assert.doesNotMatch(
