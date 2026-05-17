@@ -188,3 +188,19 @@ Night rain (grid + home + EV)
 ## License
 
 MIT
+
+## Trademark notice
+
+This project is an independent, community-built Home Assistant Lovelace
+card. It is **not affiliated with, endorsed by, sponsored by, or in any
+way officially connected to Tesla, Inc.**
+
+"Tesla" and any related marks are trademarks of Tesla, Inc., used here
+in a purely descriptive sense to indicate the visual style this card
+takes inspiration from. The card does not redistribute Tesla artwork,
+logos, screenshots, or any other Tesla-owned material. All graphics
+shipped in `dist/backgrounds/` are original work intended to evoke a
+similar aesthetic.
+
+If you are a Tesla representative and have concerns about this project,
+please open an issue and the maintainers will respond promptly.
