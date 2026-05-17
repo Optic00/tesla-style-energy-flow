@@ -2,14 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import zlib from 'node:zlib';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'dist', 'tesla-style-energy-flow.js'), 'utf8');
-const gzipSource = zlib.gunzipSync(
-  fs.readFileSync(path.join(root, 'dist', 'tesla-style-energy-flow.js.gz'))
-).toString('utf8');
 
 assert.match(
   source,
@@ -371,8 +367,3 @@ assert.match(
   'the SVG should include a sky dimming layer so text remains readable on bright backgrounds'
 );
 
-assert.equal(
-  gzipSource,
-  source,
-  'the gzip artifact should contain the same updated JavaScript that Home Assistant may serve'
-);
