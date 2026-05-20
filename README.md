@@ -26,10 +26,6 @@ Custom Home Assistant Lovelace card for energy flows on a house scene, with dyna
 
 ![Tesla Style Energy Flow single EV day](docs/screenshots/08-single-ev-day-clear.png)
 
-![Tesla Style Energy Flow animated demo](docs/screenshots/07-night-rain-demo.gif)
-
-[Watch demo video](docs/media/tesla-style-energy-flow-demo.mp4)
-
 [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Screenshots](#screenshots) • [Files](#files) • [License](#license)
 
 ## Features
