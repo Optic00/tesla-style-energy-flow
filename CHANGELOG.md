@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.26 - 2026-05-26
+
+- Added a visual scene-position editor with modal preview, drag handles, and compact X/Y controls
+- Improved editor stability with debounced config updates and focus-aware rendering to avoid cursor jumps while editing
+- Refined the Tesla-style UI with smaller grey labels, larger white values, and dedicated battery/EV charge-direction arrows
+- Enhanced scene readability with updated label alignment, guide spacing, time-of-day tone gradients, and refreshed background assets
+- Added visual polish regression coverage for the packaged `dist/tesla-style-energy-flow.js` bundle
+
 ## 0.3.25 - 2026-03-28
 
 - Added optional `roof_a_label` and `roof_b_label` so PV array names can be customized
