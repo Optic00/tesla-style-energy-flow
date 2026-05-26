@@ -3189,15 +3189,13 @@
       const presenceIds = this._entityIdsByDomains(['binary_sensor', 'device_tracker', 'person', 'input_boolean']);
       const weatherIds = this._entityIdsByDomain('weather');
       const sunIds = this._entityIdsByDomain('sun');
-      // Filtered lists for common field types — reduces long dropdowns to plausible matches.
       const cfg = this._config;
+      const b = cfg.background_map || {};
+      // Filtered lists for common field types — reduces long dropdowns to plausible matches.
       const powerIds = (path) => this._sensorIdsByUnitOrClass(['W', 'kW'], ['power'], String(this._getByPath(path) || ''));
       const pctIds = (path) => this._sensorIdsByUnitOrClass(['%'], ['battery'], String(this._getByPath(path) || ''));
       const voltIds = (path) => this._sensorIdsByUnitOrClass(['V'], ['voltage'], String(this._getByPath(path) || ''));
       const ampIds = (path) => this._sensorIdsByUnitOrClass(['A'], ['current'], String(this._getByPath(path) || ''));
-
-      const cfg = this._config;
-      const b = cfg.background_map || {};
 
       this.shadowRoot.innerHTML = `
         <style>
