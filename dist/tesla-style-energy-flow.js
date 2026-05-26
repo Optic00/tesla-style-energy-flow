@@ -2444,11 +2444,8 @@
       battChargeRemaining = Math.max(0, battChargeRemaining - solarToBattery);
       solarRemaining = Math.max(0, solarRemaining - solarToBattery);
 
-      let gridToBattery = 0;
-      if (solarToBattery < batteryMin) {
-        gridToBattery = Math.min(battChargeRemaining, gridImportRemaining);
-        gridImportRemaining = Math.max(0, gridImportRemaining - gridToBattery);
-      }
+      const gridToBattery = Math.min(battChargeRemaining, gridImportRemaining);
+      gridImportRemaining = Math.max(0, gridImportRemaining - gridToBattery);
 
       const solarExport = Math.min(gridExport, solarRemaining);
       const remainingGridExport = Math.max(0, gridExport - solarExport);
