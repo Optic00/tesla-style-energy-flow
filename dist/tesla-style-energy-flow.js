@@ -2717,7 +2717,9 @@
         .concat(
           values.map((id) => {
             const selected = id === current ? ' selected' : '';
-            return `<option value="${this._escapeHtml(id)}"${selected}>${this._escapeHtml(id)}</option>`;
+            const friendlyName = this._hass?.states[id]?.attributes?.friendly_name;
+            const displayText = friendlyName ? `${friendlyName} · ${id}` : id;
+            return `<option value="${this._escapeHtml(id)}"${selected}>${this._escapeHtml(displayText)}</option>`;
           })
         )
         .join('');
@@ -3514,27 +3516,73 @@
           .entity-select {
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
           }
+          .group-divider {
+            grid-column: 1 / -1;
+            margin: 4px 0 0 0;
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.07);
+          }
+          .group-label {
+            grid-column: 1 / -1;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--secondary-text-color);
+            opacity: 0.7;
+            padding-top: 4px;
+          }
+          .note {
+            grid-column: 1 / -1;
+            font-size: 11px;
+            color: var(--secondary-text-color);
+            opacity: 0.6;
+            font-style: italic;
+          }
+          .visual-editor-btn-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+          }
+          button.visual-editor-btn {
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary-color, #03a9f4);
+            color: #fff;
+            cursor: pointer;
+            letter-spacing: 0.03em;
+          }
+          button.visual-editor-btn:hover {
+            opacity: 0.88;
+          }
+          details.collapsible {
+            grid-column: 1 / -1;
+          }
+          details.collapsible summary {
+            font-size: 12px;
+            cursor: pointer;
+            color: var(--secondary-text-color);
+            padding: 4px 0;
+            user-select: none;
+          }
+          details.collapsible .grid {
+            margin-top: 8px;
+          }
         </style>
         <div class="wrap">
+
+          <!-- ① General -->
           <div class="block">
             <h4>${this._t('editor.section_general', 'General')}</h4>
             <div class="grid">
               <label>${this._t('editor.field_title', 'Title')}</label>
               <input data-path="title" value="${cfg.title || ''}">
               ${this._languageSelectRow()}
-              <label>${this._t('editor.field_background', 'Background URL')}</label>
-              <input data-path="background" value="${cfg.background || ''}">
-              <label>${this._t('editor.field_background_base', 'Background Assets Base (auto)')}</label>
-              <input data-path="background_asset_base" value="${cfg.background_asset_base || '/local/community/tesla-style-energy-flow/backgrounds'}">
               ${this._powerUnitModeRow()}
-              <div class="row">
-                <label>${this._t('editor.field_grid_invert', 'Invert grid sign')}</label>
-                <input type="checkbox" data-path="grid_invert" ${cfg.grid_invert ? 'checked' : ''}>
-              </div>
-              <div class="row">
-                <label>Invert battery sign</label>
-                <input type="checkbox" data-path="battery_invert" ${cfg.battery_invert ? 'checked' : ''}>
-              </div>
               <div class="row">
                 <label>Show header</label>
                 <input type="checkbox" data-path="show_header" ${cfg.show_header !== false ? 'checked' : ''}>
@@ -3551,14 +3599,126 @@
               <input type="number" step="0.01" data-path="scene_scale" value="${safeNum(cfg.scene_scale, 1)}">
               <label>Font scale</label>
               <input type="number" step="0.05" min="0.75" max="1.35" data-path="font_scale" value="${safeNum(cfg.font_scale, 1)}">
-              <label>EV 1 label</label>
-              <input data-path="ev_label" value="${this._escapeHtml(cfg.ev_label || '')}">
-              <label>EV 2 label</label>
-              <input data-path="ev2_label" value="${this._escapeHtml(cfg.ev2_label || '')}">
-              <label>Roof Array A label</label>
-              <input data-path="roof_a_label" value="${this._escapeHtml(cfg.roof_a_label || 'ARRAY A')}">
-              <label>Roof Array B label</label>
-              <input data-path="roof_b_label" value="${this._escapeHtml(cfg.roof_b_label || 'ARRAY B')}">
+            </div>
+          </div>
+
+          <!-- ② Visual layout editor — prominent, at the top -->
+          <div class="block">
+            <h4>${this._t('editor.section_scene_positions', 'Scene positions')}</h4>
+            <div class="visual-editor-btn-wrap">
+              <button type="button" class="visual-editor-btn position-open-button" data-open-position-editor>${this._t('editor.position_open_button', 'Edit visually')}</button>
+              <span class="hint">${this._t('editor.position_hint', 'Battery percent follows the battery kW value automatically. Path geometry stays in YAML/JSON.')}</span>
+            </div>
+            <details class="collapsible position-json-details" style="margin-top:8px">
+              <summary>scene_component_map JSON</summary>
+              <textarea class="positions-json" data-json-path="scene_component_map" data-commit="change" spellcheck="false">${this._escapeHtml(this._jsonString('scene_component_map'))}</textarea>
+            </details>
+          </div>
+
+          <!-- ③ Solar sensors -->
+          <div class="block">
+            <h4>☀️ Solar</h4>
+            <div class="grid">
+              ${this._entitySelectRow(this._t('editor.sensor_solar', 'Solar Power'), 'entities.solar_power', powerIds('entities.solar_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              <details class="collapsible">
+                <summary>Roof Array A / B (optional)</summary>
+                <div class="grid">
+                  ${this._entitySelectRow('Roof Array A Power', 'entities.roof_a_power', powerIds('entities.roof_a_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+                  ${this._entitySelectRow('Roof Array A Voltage', 'entities.roof_a_voltage', voltIds('entities.roof_a_voltage'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+                  ${this._entitySelectRow('Roof Array A Current', 'entities.roof_a_current', ampIds('entities.roof_a_current'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+                  ${this._entitySelectRow('Roof Array B Power', 'entities.roof_b_power', powerIds('entities.roof_b_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+                  ${this._entitySelectRow('Roof Array B Voltage', 'entities.roof_b_voltage', voltIds('entities.roof_b_voltage'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+                  ${this._entitySelectRow('Roof Array B Current', 'entities.roof_b_current', ampIds('entities.roof_b_current'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <!-- ④ Grid sensors -->
+          <div class="block">
+            <h4>⚡ Grid</h4>
+            <div class="grid">
+              <span class="group-label">Combined sensor (+ = import, − = export)</span>
+              ${this._entitySelectRow(this._t('editor.sensor_grid', 'Grid Power'), 'entities.grid_power', powerIds('entities.grid_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${(cfg.entities?.grid_import_power || cfg.entities?.grid_export_power) ? '' : `
+              <div class="row">
+                <label>${this._t('editor.field_grid_invert', 'Invert grid sign')}</label>
+                <input type="checkbox" data-path="grid_invert" ${cfg.grid_invert ? 'checked' : ''}>
+              </div>`}
+              <hr class="group-divider">
+              <span class="group-label">— or — separate sensors (always positive)</span>
+              ${this._entitySelectRow(this._t('editor.sensor_grid_import', 'Grid Import Power'), 'entities.grid_import_power', powerIds('entities.grid_import_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${this._entitySelectRow(this._t('editor.sensor_grid_export', 'Grid Export Power'), 'entities.grid_export_power', powerIds('entities.grid_export_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${(cfg.entities?.grid_import_power || cfg.entities?.grid_export_power) ? `<span class="note">grid_invert not needed when using separate import/export sensors</span>` : ''}
+            </div>
+          </div>
+
+          <!-- ⑤ Battery sensors -->
+          <div class="block">
+            <h4>🔋 Battery</h4>
+            <div class="grid">
+              <span class="group-label">Combined sensor (+ = charging, − = discharging)</span>
+              ${this._entitySelectRow(this._t('editor.sensor_battery', 'Battery Power'), 'entities.battery_power', powerIds('entities.battery_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${(cfg.entities?.battery_charge_power || cfg.entities?.battery_discharge_power) ? '' : `
+              <div class="row">
+                <label>Invert battery sign</label>
+                <input type="checkbox" data-path="battery_invert" ${cfg.battery_invert ? 'checked' : ''}>
+              </div>`}
+              <hr class="group-divider">
+              <span class="group-label">— or — separate sensors (always positive)</span>
+              ${this._entitySelectRow(this._t('editor.sensor_battery_charge', 'Battery Charge Power'), 'entities.battery_charge_power', powerIds('entities.battery_charge_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${this._entitySelectRow(this._t('editor.sensor_battery_discharge', 'Battery Discharge Power'), 'entities.battery_discharge_power', powerIds('entities.battery_discharge_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${(cfg.entities?.battery_charge_power || cfg.entities?.battery_discharge_power) ? `<span class="note">battery_invert not needed when using separate charge/discharge sensors</span>` : ''}
+              <hr class="group-divider">
+              <span class="group-label">State of charge</span>
+              ${this._entitySelectRow(this._t('editor.sensor_battery_level', 'Battery Level %'), 'entities.battery_level', pctIds('entities.battery_level'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+            </div>
+          </div>
+
+          <!-- ⑥ Load -->
+          <div class="block">
+            <h4>🏠 Home / Load</h4>
+            <div class="grid">
+              ${this._entitySelectRow(this._t('editor.sensor_load', 'Load Power'), 'entities.load_power', powerIds('entities.load_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+            </div>
+          </div>
+
+          <!-- ⑦ EV 1 -->
+          <div class="block">
+            <h4>🚗 EV 1</h4>
+            <div class="grid">
+              ${this._entitySelectRow(this._t('editor.sensor_ev_power', 'EV Power'), 'entities.ev_power', powerIds('entities.ev_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${this._entitySelectRow(this._t('editor.sensor_ev_battery', 'EV Battery %'), 'entities.ev_battery', pctIds('entities.ev_battery'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${this._entitySelectRow(this._t('editor.sensor_ev_switch', 'EV Charge Switch'), 'entities.ev_charge_switch', switchIds, this._t('editor.placeholder_switch', '-- select switch --'))}
+              ${this._entitySelectRow('EV 1 Presence', 'entities.ev_presence', presenceIds, '-- select presence entity --')}
+            </div>
+          </div>
+
+          <!-- ⑧ EV 2 -->
+          <div class="block">
+            <h4>🚗 EV 2</h4>
+            <div class="grid">
+              ${this._entitySelectRow(this._t('editor.sensor_ev2_power', 'EV 2 Power'), 'entities.ev2_power', powerIds('entities.ev2_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${this._entitySelectRow(this._t('editor.sensor_ev2_battery', 'EV 2 Battery %'), 'entities.ev2_battery', pctIds('entities.ev2_battery'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              ${this._entitySelectRow(this._t('editor.sensor_ev2_switch', 'EV 2 Charge Switch'), 'entities.ev2_charge_switch', switchIds, this._t('editor.placeholder_switch', '-- select switch --'))}
+              ${this._entitySelectRow('EV 2 Presence', 'entities.ev2_presence', presenceIds, '-- select presence entity --')}
+            </div>
+          </div>
+
+          <!-- ⑨ System -->
+          <div class="block">
+            <h4>🌤 System</h4>
+            <div class="grid">
+              ${this._entitySelectRow(this._t('editor.sensor_weather', 'Weather Entity'), 'entities.weather', weatherIds, this._t('editor.placeholder_weather', '-- select weather --'))}
+              ${this._entitySelectRow(this._t('editor.sensor_sun', 'Sun Entity'), 'entities.sun', sunIds, this._t('editor.placeholder_sun', '-- select sun --'))}
+            </div>
+            <div class="hint">${this._t('editor.hint_entities', 'Dropdowns filtered by unit / device class.')}</div>
+          </div>
+
+          <!-- ⑩ Thresholds -->
+          <div class="block">
+            <h4>⚙️ Thresholds</h4>
+            <div class="grid">
               <label>${this._t('editor.field_solar_threshold', 'Solar threshold (W)')}</label>
               <input type="number" data-path="thresholds.solar_min_w" value="${safeNum(cfg.thresholds?.solar_min_w, 50)}">
               <label>${this._t('editor.field_grid_threshold', 'Grid threshold (W)')}</label>
@@ -3570,106 +3730,86 @@
             </div>
           </div>
 
+          <!-- ⑪ Labels -->
           <div class="block">
-            <h4>${this._t('editor.section_sensors', 'Sensors')}</h4>
+            <h4>🏷 Labels</h4>
             <div class="grid">
-              ${this._entitySelectRow(this._t('editor.sensor_solar', 'Solar Power'), 'entities.solar_power', powerIds('entities.solar_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow('Roof Array A Power', 'entities.roof_a_power', powerIds('entities.roof_a_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow('Roof Array A Voltage', 'entities.roof_a_voltage', voltIds('entities.roof_a_voltage'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow('Roof Array A Current', 'entities.roof_a_current', ampIds('entities.roof_a_current'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow('Roof Array B Power', 'entities.roof_b_power', powerIds('entities.roof_b_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow('Roof Array B Voltage', 'entities.roof_b_voltage', voltIds('entities.roof_b_voltage'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow('Roof Array B Current', 'entities.roof_b_current', ampIds('entities.roof_b_current'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_grid', 'Grid Power'), 'entities.grid_power', powerIds('entities.grid_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_grid_import', 'Grid Import Power'), 'entities.grid_import_power', powerIds('entities.grid_import_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_grid_export', 'Grid Export Power'), 'entities.grid_export_power', powerIds('entities.grid_export_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_battery', 'Battery Power'), 'entities.battery_power', powerIds('entities.battery_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_battery_charge', 'Battery Charge Power'), 'entities.battery_charge_power', powerIds('entities.battery_charge_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_battery_discharge', 'Battery Discharge Power'), 'entities.battery_discharge_power', powerIds('entities.battery_discharge_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_load', 'Load Power'), 'entities.load_power', powerIds('entities.load_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_battery_level', 'Battery Level %'), 'entities.battery_level', pctIds('entities.battery_level'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_ev_power', 'EV Power'), 'entities.ev_power', powerIds('entities.ev_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_ev_battery', 'EV Battery %'), 'entities.ev_battery', pctIds('entities.ev_battery'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_ev_switch', 'EV Charge Switch'), 'entities.ev_charge_switch', switchIds, this._t('editor.placeholder_switch', '-- select switch --'))}
-              ${this._entitySelectRow('EV 1 Presence', 'entities.ev_presence', presenceIds, '-- select presence entity --')}
-              ${this._entitySelectRow(this._t('editor.sensor_ev2_power', 'EV 2 Power'), 'entities.ev2_power', powerIds('entities.ev2_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_ev2_battery', 'EV 2 Battery %'), 'entities.ev2_battery', pctIds('entities.ev2_battery'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_ev2_switch', 'EV 2 Charge Switch'), 'entities.ev2_charge_switch', switchIds, this._t('editor.placeholder_switch', '-- select switch --'))}
-              ${this._entitySelectRow('EV 2 Presence', 'entities.ev2_presence', presenceIds, '-- select presence entity --')}
-              ${this._entitySelectRow(this._t('editor.sensor_weather', 'Weather Entity'), 'entities.weather', weatherIds, this._t('editor.placeholder_weather', '-- select weather --'))}
-              ${this._entitySelectRow(this._t('editor.sensor_sun', 'Sun Entity'), 'entities.sun', sunIds, this._t('editor.placeholder_sun', '-- select sun --'))}
+              <label>EV 1 label</label>
+              <input data-path="ev_label" value="${this._escapeHtml(cfg.ev_label || '')}">
+              <label>EV 2 label</label>
+              <input data-path="ev2_label" value="${this._escapeHtml(cfg.ev2_label || '')}">
+              <label>Roof Array A label</label>
+              <input data-path="roof_a_label" value="${this._escapeHtml(cfg.roof_a_label || 'ARRAY A')}">
+              <label>Roof Array B label</label>
+              <input data-path="roof_b_label" value="${this._escapeHtml(cfg.roof_b_label || 'ARRAY B')}">
             </div>
-            <div class="hint">${this._t('editor.hint_entities', 'Clean menu with domain-filtered entities.')}</div>
           </div>
 
+          <!-- ⑫ Background -->
           <div class="block">
-            <h4>${this._t('editor.section_dynamic_bg', 'Dynamic Background')}</h4>
+            <h4>${this._t('editor.section_dynamic_bg', 'Background')}</h4>
             <div class="grid">
+              <label>${this._t('editor.field_background', 'Background URL')}</label>
+              <input data-path="background" value="${cfg.background || ''}">
+              <label>${this._t('editor.field_background_base', 'Background Assets Base (auto)')}</label>
+              <input data-path="background_asset_base" value="${cfg.background_asset_base || '/local/community/tesla-style-energy-flow/backgrounds'}">
               <div class="row">
-                <label>${this._t('editor.field_dynamic_bg', 'Enable dynamic')}</label>
+                <label>${this._t('editor.field_dynamic_bg', 'Enable dynamic background')}</label>
                 <input type="checkbox" data-path="dynamic_background" ${cfg.dynamic_background ? 'checked' : ''}>
               </div>
-              <label>background_map.default</label>
-              <input data-path="background_map.default" value="${b.default || ''}">
-              <label>background_map.day_default</label>
-              <input data-path="background_map.day_default" value="${b.day_default || ''}">
-              <label>background_map.night_default</label>
-              <input data-path="background_map.night_default" value="${b.night_default || ''}">
-              <label>background_map.morning_default</label>
-              <input data-path="background_map.morning_default" value="${b.morning_default || ''}">
-              <label>background_map.afternoon_default</label>
-              <input data-path="background_map.afternoon_default" value="${b.afternoon_default || ''}">
-              <label>background_map.evening_default</label>
-              <input data-path="background_map.evening_default" value="${b.evening_default || ''}">
-              <label>background_map.day_clear</label>
-              <input data-path="background_map.day_clear" value="${b.day_clear || ''}">
-              <label>background_map.day_cloudy</label>
-              <input data-path="background_map.day_cloudy" value="${b.day_cloudy || ''}">
-              <label>background_map.day_rain</label>
-              <input data-path="background_map.day_rain" value="${b.day_rain || ''}">
-              <label>background_map.night_clear</label>
-              <input data-path="background_map.night_clear" value="${b.night_clear || ''}">
-              <label>background_map.night_cloudy</label>
-              <input data-path="background_map.night_cloudy" value="${b.night_cloudy || ''}">
-              <label>background_map.night_rain</label>
-              <input data-path="background_map.night_rain" value="${b.night_rain || ''}">
-              <label>background_map.day_clear_idle</label>
-              <input data-path="background_map.day_clear_idle" value="${b.day_clear_idle || ''}">
-              <label>background_map.day_clear_charging</label>
-              <input data-path="background_map.day_clear_charging" value="${b.day_clear_charging || ''}">
-              <label>background_map.morning_clear_idle</label>
-              <input data-path="background_map.morning_clear_idle" value="${b.morning_clear_idle || ''}">
-              <label>background_map.morning_clear_charging</label>
-              <input data-path="background_map.morning_clear_charging" value="${b.morning_clear_charging || ''}">
-              <label>background_map.afternoon_clear_idle</label>
-              <input data-path="background_map.afternoon_clear_idle" value="${b.afternoon_clear_idle || ''}">
-              <label>background_map.afternoon_clear_charging</label>
-              <input data-path="background_map.afternoon_clear_charging" value="${b.afternoon_clear_charging || ''}">
-              <label>background_map.evening_clear_idle</label>
-              <input data-path="background_map.evening_clear_idle" value="${b.evening_clear_idle || ''}">
-              <label>background_map.evening_clear_charging</label>
-              <input data-path="background_map.evening_clear_charging" value="${b.evening_clear_charging || ''}">
-              <label>background_map.night_clear_idle</label>
-              <input data-path="background_map.night_clear_idle" value="${b.night_clear_idle || ''}">
-              <label>background_map.night_clear_charging</label>
-              <input data-path="background_map.night_clear_charging" value="${b.night_clear_charging || ''}">
+              <details class="collapsible">
+                <summary>Dynamic background map URLs (${Object.values(b).filter(Boolean).length} configured)</summary>
+                <div class="grid">
+                  <label>background_map.default</label>
+                  <input data-path="background_map.default" value="${b.default || ''}">
+                  <label>background_map.day_default</label>
+                  <input data-path="background_map.day_default" value="${b.day_default || ''}">
+                  <label>background_map.night_default</label>
+                  <input data-path="background_map.night_default" value="${b.night_default || ''}">
+                  <label>background_map.morning_default</label>
+                  <input data-path="background_map.morning_default" value="${b.morning_default || ''}">
+                  <label>background_map.afternoon_default</label>
+                  <input data-path="background_map.afternoon_default" value="${b.afternoon_default || ''}">
+                  <label>background_map.evening_default</label>
+                  <input data-path="background_map.evening_default" value="${b.evening_default || ''}">
+                  <label>background_map.day_clear</label>
+                  <input data-path="background_map.day_clear" value="${b.day_clear || ''}">
+                  <label>background_map.day_cloudy</label>
+                  <input data-path="background_map.day_cloudy" value="${b.day_cloudy || ''}">
+                  <label>background_map.day_rain</label>
+                  <input data-path="background_map.day_rain" value="${b.day_rain || ''}">
+                  <label>background_map.night_clear</label>
+                  <input data-path="background_map.night_clear" value="${b.night_clear || ''}">
+                  <label>background_map.night_cloudy</label>
+                  <input data-path="background_map.night_cloudy" value="${b.night_cloudy || ''}">
+                  <label>background_map.night_rain</label>
+                  <input data-path="background_map.night_rain" value="${b.night_rain || ''}">
+                  <label>background_map.day_clear_idle</label>
+                  <input data-path="background_map.day_clear_idle" value="${b.day_clear_idle || ''}">
+                  <label>background_map.day_clear_charging</label>
+                  <input data-path="background_map.day_clear_charging" value="${b.day_clear_charging || ''}">
+                  <label>background_map.morning_clear_idle</label>
+                  <input data-path="background_map.morning_clear_idle" value="${b.morning_clear_idle || ''}">
+                  <label>background_map.morning_clear_charging</label>
+                  <input data-path="background_map.morning_clear_charging" value="${b.morning_clear_charging || ''}">
+                  <label>background_map.afternoon_clear_idle</label>
+                  <input data-path="background_map.afternoon_clear_idle" value="${b.afternoon_clear_idle || ''}">
+                  <label>background_map.afternoon_clear_charging</label>
+                  <input data-path="background_map.afternoon_clear_charging" value="${b.afternoon_clear_charging || ''}">
+                  <label>background_map.evening_clear_idle</label>
+                  <input data-path="background_map.evening_clear_idle" value="${b.evening_clear_idle || ''}">
+                  <label>background_map.evening_clear_charging</label>
+                  <input data-path="background_map.evening_clear_charging" value="${b.evening_clear_charging || ''}">
+                  <label>background_map.night_clear_idle</label>
+                  <input data-path="background_map.night_clear_idle" value="${b.night_clear_idle || ''}">
+                  <label>background_map.night_clear_charging</label>
+                  <input data-path="background_map.night_clear_charging" value="${b.night_clear_charging || ''}">
+                </div>
+              </details>
             </div>
             <div class="hint">${this._t('editor.hint_bg_lookup', 'Lookup priority: period+weather+charging -> period+weather -> period_default -> default -> background.')}</div>
           </div>
 
-          <div class="block">
-            <h4>${this._t('editor.section_scene_positions', 'Scene positions')}</h4>
-            <div class="grid">
-              <div class="position-actions">
-                <button type="button" class="position-open-button" data-open-position-editor>${this._t('editor.position_open_button', 'Edit visually')}</button>
-              </div>
-              <details class="position-json-details">
-                <summary>scene_component_map JSON</summary>
-                <textarea class="positions-json" data-json-path="scene_component_map" data-commit="change" spellcheck="false">${this._escapeHtml(this._jsonString('scene_component_map'))}</textarea>
-              </details>
-            </div>
-            <div class="hint">${this._t('editor.position_hint', 'Battery percent follows the battery kW value automatically. Path geometry stays in YAML/JSON.')}</div>
-          </div>
           ${this._positionEditorModal()}
         </div>
       `;
