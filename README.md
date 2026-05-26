@@ -2,13 +2,11 @@
 
 Custom Home Assistant Lovelace card for energy flows on a house scene, with dynamic weather/day-night backgrounds and EV-aware layout switching.
 
-> **Fork notice** — This is a community fork of
-> [stexecute/tesla-style-energy-flow](https://github.com/stexecute/tesla-style-energy-flow)
-> (MIT). It adds the following on top of upstream:
+> Recent additions:
 >
 > - Visual scene-position editor (modal with drag handles for label,
 >   value and guide endpoints, per background scene)
-> - Editor debouncing and focus tracking — no more cursor jumps while
+> - Editor debouncing and focus tracking to avoid cursor jumps while
 >   typing in the config sidebar
 > - Tesla-style label hierarchy (smaller grey labels, larger white
 >   values) with a dedicated charge-direction arrow between the value
@@ -17,10 +15,6 @@ Custom Home Assistant Lovelace card for energy flows on a house scene, with dyna
 >   evening / night / storm) layered on top of the existing weather
 >   backgrounds
 > - Extended `background_map` keys for the new time-of-day slots
->
-> Upstream maintainer: stexecute. Contributions back to upstream are
-> planned in small, focused pull requests. Until those land this fork
-> may be installed as a HACS Custom Repository.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=stexecute&repository=tesla-style-energy-flow&category=dashboard)
 
