@@ -1334,8 +1334,44 @@
     }
 
     set hass(hass) {
+      const prevHass = this._hass;
       this._hass = hass;
-      this._render();
+      // HA fires set hass() on every state update in the whole instance, even for
+      // entities this card does not read. Skip re-rendering when nothing we
+      // actually use has changed. HA reuses the state object reference when an
+      // entity's state did not change, so a strict !== check is sufficient and
+      // O(N) over the ~24 tracked entity IDs.
+      if (!prevHass || this._hasTrackedHassChange(prevHass, hass)) {
+        this._render();
+      }
+    }
+
+    _trackedEntityIds() {
+      const e = (this._config && this._config.entities) || {};
+      return [
+        e.solar_power,
+        e.grid_power, e.grid_import_power, e.grid_export_power,
+        e.battery_power, e.battery_charge_power, e.battery_discharge_power, e.battery_level,
+        e.roof_a_power, e.roof_a_voltage, e.roof_a_current,
+        e.roof_b_power, e.roof_b_voltage, e.roof_b_current,
+        e.load_power,
+        e.ev_power, e.ev_battery, e.ev_charge_switch, e.ev_presence,
+        e.ev2_power, e.ev2_battery, e.ev2_charge_switch, e.ev2_presence,
+        e.weather,
+        e.sun || 'sun.sun',
+      ].filter(Boolean);
+    }
+
+    _hasTrackedHassChange(prev, next) {
+      if (prev === next) return false;
+      if (!prev || !next) return true;
+      if (prev.language !== next.language) return true;
+      if (prev.locale?.language !== next.locale?.language) return true;
+      const ids = this._trackedEntityIds();
+      for (const id of ids) {
+        if (prev.states[id] !== next.states[id]) return true;
+      }
+      return false;
     }
 
     getCardSize() {
