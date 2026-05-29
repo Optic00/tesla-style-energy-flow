@@ -114,6 +114,8 @@
         position_modal_kicker: 'Posizioni scena',
         position_close_button: 'Chiudi',
         position_field_scene: 'Scena',
+        position_copy_from: 'Copia posizioni da',
+        position_copy_button: 'Applica',
         position_field_label: 'Etichetta',
         position_field_value: 'Valore',
         position_field_guide_a: 'Linea A',
@@ -197,6 +199,8 @@
         position_modal_kicker: 'Scene positions',
         position_close_button: 'Close',
         position_field_scene: 'Scene',
+        position_copy_from: 'Copy positions from',
+        position_copy_button: 'Apply',
         position_field_label: 'Label',
         position_field_value: 'Value',
         position_field_guide_a: 'Guide A',
@@ -280,6 +284,8 @@
         position_modal_kicker: 'Posiciones de escena',
         position_close_button: 'Cerrar',
         position_field_scene: 'Escena',
+        position_copy_from: 'Copiar posiciones de',
+        position_copy_button: 'Aplicar',
         position_field_label: 'Etiqueta',
         position_field_value: 'Valor',
         position_field_guide_a: 'Linea A',
@@ -363,6 +369,8 @@
         position_modal_kicker: 'Positions de scene',
         position_close_button: 'Fermer',
         position_field_scene: 'Scene',
+        position_copy_from: 'Copier positions depuis',
+        position_copy_button: 'Appliquer',
         position_field_label: 'Etiquette',
         position_field_value: 'Valeur',
         position_field_guide_a: 'Repere A',
@@ -446,6 +454,8 @@
         position_modal_kicker: 'Szenenpositionen',
         position_close_button: 'Schliessen',
         position_field_scene: 'Szene',
+        position_copy_from: 'Positionen kopieren von',
+        position_copy_button: 'Übernehmen',
         position_field_label: 'Beschriftung',
         position_field_value: 'Wert',
         position_field_guide_a: 'Linie A',
@@ -2771,7 +2781,9 @@
       this._editingPath = '';
       this._positionDrag = null;
       this._positionEditorOpen = false;
-      this._positionSceneKey = POSITION_EDITOR_SCENES[0]?.key || 'scene_day_clear_idle.png';
+      // Empty so _selectedPositionScene() falls back to the user's configured
+      // background — opening the editor lands on the scene they actually see.
+      this._positionSceneKey = '';
     }
 
     setConfig(config) {
@@ -3166,6 +3178,15 @@
         <select data-position-scene>
           ${this._positionSceneOptions(selectedScene)}
         </select>
+        <div class="position-copy-row">
+          <label>${this._t('editor.position_copy_from', 'Copy positions from')}</label>
+          <select data-position-copy-source>
+            ${this._positionSceneOptions('')}
+          </select>
+          <button type="button" data-copy-positions data-position-target="${this._escapeHtml(selectedScene)}">
+            ${this._t('editor.position_copy_button', 'Apply')}
+          </button>
+        </div>
         ${this._positionPreviewSvg(selectedScene)}
         <div class="position-groups${modalClass}">
           ${this._positionEditorGroups(selectedScene).map((group) => this._positionGroupRows(selectedScene, group)).join('')}
@@ -3253,6 +3274,25 @@
       nextMap[sceneKey] = scene;
       this._applyEditorValue('scene_component_map', nextMap);
       if (emit) this._emitConfig();
+    }
+
+    // Copy every label / power / guide coordinate from srcSceneKey onto
+    // dstSceneKey. Reads the FULLY MERGED source map (defaults + user
+    // overrides) so even a never-customised source still produces a copy.
+    _copyScenePositions(srcSceneKey, dstSceneKey) {
+      if (!srcSceneKey || !dstSceneKey || srcSceneKey === dstSceneKey) return;
+      const fullMap = this._sceneFlowComponentMap();
+      const srcScene = fullMap[srcSceneKey];
+      if (!srcScene) return;
+      const changes = [];
+      Object.keys(srcScene).forEach((componentKey) => {
+        const component = srcScene[componentKey] || {};
+        Object.keys(component).forEach((attr) => {
+          changes.push({ componentKey, attr, value: component[attr] });
+        });
+      });
+      if (changes.length === 0) return;
+      this._applyScenePositionChanges(dstSceneKey, changes, true);
     }
 
     _updateSceneComponentPosition(sceneKey, componentKey, attr, value, emit = true) {
@@ -3590,6 +3630,34 @@
             grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 10px;
             min-width: 0;
+          }
+          .position-copy-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+            flex-wrap: wrap;
+          }
+          .position-copy-row label {
+            margin: 0;
+            font-size: 12px;
+            opacity: 0.85;
+          }
+          .position-copy-row select {
+            flex: 1 1 160px;
+            min-width: 120px;
+          }
+          .position-copy-row button {
+            padding: 4px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(56,189,248,0.18);
+            color: inherit;
+            cursor: pointer;
+            font-size: 12px;
+          }
+          .position-copy-row button:hover {
+            background: rgba(56,189,248,0.28);
           }
           .position-preview-frame {
             border: 1px solid rgba(255,255,255,0.12);
@@ -4068,6 +4136,17 @@
         button.addEventListener('click', () => {
           this._flushEditorUpdate();
           this._positionEditorOpen = false;
+          this._render();
+        });
+      });
+
+      this.shadowRoot.querySelectorAll('button[data-copy-positions]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const target = button.dataset.positionTarget;
+          const sourceSelect = button.parentElement?.querySelector('select[data-position-copy-source]');
+          const source = sourceSelect?.value;
+          if (!source || !target || source === target) return;
+          this._copyScenePositions(source, target);
           this._render();
         });
       });
