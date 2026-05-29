@@ -2752,7 +2752,18 @@
       this._activatePath('line-solar-grid', 'flow-green', solarExport, Math.max(1, gridMin));
 
       const evTotal = solarToEv + battToEv + gridToEv;
-      const evCls = this._dominantFlowClass('ev', solarToEv, battToEv, gridToEv, 'flow-green');
+      // Mirror the line-solar-grid convention (always green when solar
+      // exports to grid because it's semantically positive) for EV charging:
+      // when >= 80 % of the wallbox draw comes from renewable sources
+      // (solar direct + battery), paint the line green regardless of which
+      // single source happens to be largest. Below that threshold fall back
+      // to the source-dominant color (yellow / green / red).
+      const evRenewableShare = evTotal > 0
+        ? (solarToEv + battToEv) / evTotal
+        : 0;
+      const evCls = evRenewableShare >= 0.8
+        ? 'flow-green'
+        : this._dominantFlowClass('ev', solarToEv, battToEv, gridToEv, 'flow-green');
       const ev1Share = evDraw > 0 ? ev1Draw / evDraw : 0;
       const ev2Share = evDraw > 0 ? ev2Draw / evDraw : 0;
       this._activatePath('line-wallbox-ev', evCls, evTotal * ev1Share, 1);
