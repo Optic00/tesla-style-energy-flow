@@ -2190,7 +2190,12 @@
             opacity: 1;
             stroke-dasharray: var(--flow-seg, 62) var(--flow-gap, 82);
             animation: flowStream var(--flow-speed, 1.9s) linear infinite, flowPulse var(--flow-fade, 1.45s) ease-in-out infinite;
-            filter: drop-shadow(0 0 3px var(--flow-glow, rgba(125, 249, 255, 0.4)))
+            /* Dark contrast outline first (helps on light/busy backgrounds), then the
+               bright glow stack (helps on dark backgrounds). The outline is tight
+               (sub-pixel blur) so the colored stroke stays sharp. */
+            filter: drop-shadow(0 0 0.6px rgba(2, 8, 23, 0.95))
+                    drop-shadow(0 0 0.6px rgba(2, 8, 23, 0.85))
+                    drop-shadow(0 0 3px var(--flow-glow, rgba(125, 249, 255, 0.4)))
                     drop-shadow(0 0 12px var(--flow-glow, rgba(125, 249, 255, 0.4)));
           }
           .flow-line.active.flow-reverse {
@@ -2233,9 +2238,9 @@
             to { stroke-dashoffset: 144; }
           }
           @keyframes flowPulse {
-            0%, 100% { opacity: 0.8; stroke-width: 2.1; }
-            45% { opacity: 1; stroke-width: 2.9; }
-            82% { opacity: 0.9; stroke-width: 2.4; }
+            0%, 100% { opacity: 0.85; stroke-width: 2.4; }
+            45% { opacity: 1; stroke-width: 3.3; }
+            82% { opacity: 0.92; stroke-width: 2.8; }
           }
         </style>
         <ha-card>
