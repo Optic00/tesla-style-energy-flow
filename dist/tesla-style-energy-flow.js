@@ -1428,6 +1428,25 @@
       };
     }
 
+    connectedCallback() {
+      if (typeof IntersectionObserver === 'undefined') return;
+      if (this._visibilityObserver) return;
+      this._visibilityObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          this.classList.toggle('flow-offscreen', !entry.isIntersecting);
+        }
+      }, { threshold: 0 });
+      this._visibilityObserver.observe(this);
+    }
+
+    disconnectedCallback() {
+      if (this._visibilityObserver) {
+        this._visibilityObserver.disconnect();
+        this._visibilityObserver = null;
+      }
+      this.classList.remove('flow-offscreen');
+    }
+
     _entityState(entityId) {
       if (!entityId || !this._hass) return null;
       return this._hass.states[entityId] || null;
@@ -2336,6 +2355,11 @@
           .hide-labels .flow-pct,
           .hide-labels .flow-status {
             display: none;
+          }
+          /* Pause CSS animations when the card is scrolled out of view.
+             Toggled by an IntersectionObserver on the host element. */
+          :host(.flow-offscreen) .flow-line.active {
+            animation-play-state: paused;
           }
           @keyframes flowStream {
             to { stroke-dashoffset: -144; }
