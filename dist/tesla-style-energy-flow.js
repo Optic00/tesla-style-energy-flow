@@ -2038,6 +2038,7 @@
       this._smoothState = {};
       this._pathLastActive = {};
       this._lastDominant = {};
+      this._evSolarOnlyActive = false;
       this._elCache = new Map();
       this._flowLinesCache = null;
       this._syncedFlowAnimations = new WeakSet();
@@ -2058,6 +2059,7 @@
       this._smoothState = {};
       this._pathLastActive = {};
       this._lastDominant = {};
+      this._evSolarOnlyActive = false;
       // Config-derived caches — invalidate so the next render rebuilds them.
       this._elCache = new Map();
       this._flowLinesCache = null;
@@ -3706,14 +3708,22 @@
       const battToHp = battToFlex * hpShareOfFlex;
       const gridToHp = gridToFlex * hpShareOfFlex;
       const hpTotal = solarToHp + battToHp + gridToHp;
-      // For EV charging: when >= 80 % of the wallbox draw comes from renewable sources
-      // (solar direct + battery), paint the line green regardless of which
-      // single source happens to be largest. Below that threshold fall back
-      // to the source-dominant color (yellow / green / red).
+      // EV line colour, in order of precedence:
+      //  1. Solar only (battery + grid share below 5 %, left above 10 %): yellow.
+      //  2. >= 80 % renewable AND the battery contributes at least battery_min_w: green.
+      //  3. Otherwise the source-dominant colour (yellow / green / red).
       const evRenewableShare = evTotal > 0
         ? (solarToEv + battToEv) / evTotal
         : 0;
-      const evCls = evRenewableShare >= 0.8
+      // Hysteresis: enter below 5 % non-solar share, leave above 10 %, so a share
+      // hovering around the boundary does not flip the colour on every update.
+      const evNonSolarShare = evTotal > 0 ? (battToEv + gridToEv) / evTotal : 1;
+      const evSolarOnly = evTotal > 0 &&
+        evNonSolarShare < (this._evSolarOnlyActive ? 0.10 : 0.05);
+      this._evSolarOnlyActive = evSolarOnly;
+      const evCls = evSolarOnly
+        ? 'flow-solar'
+        : (evRenewableShare >= 0.8 && battToEv >= batteryMin)
         ? 'flow-green'
         : this._dominantFlowClass('ev', solarToEv, battToEv, gridToEv, 'flow-green');
       const ev1Share = evDraw > 0 ? ev1Draw / evDraw : 0;
